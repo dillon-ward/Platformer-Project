@@ -4,10 +4,9 @@ from prototype_presets import *
 """ Create the player class as a subclass of the pygame class pygame.sprite.Sprite """
 class Player(pygame.sprite.Sprite):
 
-    canWalljumpLeft = False
-    canWalljumpRight = False
-    leftWalljump = False
-    rightWalljump = False
+    isGrounded = False
+    jumpBoost = False
+    slideBoost = False
 
     """ Calls the constructor when the object is instantiated """
     def __init__(self):
@@ -29,13 +28,11 @@ class Player(pygame.sprite.Sprite):
     """ Create the gravity method to calculate gravity on player """
     def calc_grav(self):
         
-        # Check if the player is at the bottom of the screen
+        # If player is at the bottom of the screen they die
+        # Player is placed back to the start of the level
         if self.rect.y >= SCREEN_HEIGHT - self.rect.height and self.change_y >= 0:
-            self.change_y = 0 # Gravity keeps player on the ground
-            self.isGrounded = True
-
-        # Player is not grounded
-        # Checks if player is falling from after max height
+            self.rect.x = 10
+            self.rect.y = 0
         elif self.change_y == 0:
             self.change_y = 1 # Player's fall speed
         else:
@@ -47,18 +44,25 @@ class Player(pygame.sprite.Sprite):
 
         """ Moves the player """
         # Gravity method is called
+        
         self.calc_grav()
 
-        # Walljump logic
-        if self.change_y < 0:
-            if self.leftWalljump:
-                self.rect.x += 2
-            elif self.rightWalljump:
-                self.rect.x -= 2
-        else:
-            self.leftWalljump = False
-            self.rightWalljump = False
+        # When player falls they can no longer walljump
+        if self.change_y > 0:
+            self.canWalljumpRight = False
+            self.canWalljumpLeft = False
 
+        # Halts horizontal movement from walljump when player hits the ground
+        if self.isGrounded and self.change_x == 2 or self.isGrounded and self.change_x == -2:
+            self.stop()
+
+        # Check for slide boost
+        if self.slideBoost:
+            if self.change_x == 5:
+                self.change_x += 5
+            elif self.change_x == -5:
+                self.change_x -= 5
+        
         # Player moves horizontally
         self.rect.x += self.change_x
         
@@ -73,11 +77,18 @@ class Player(pygame.sprite.Sprite):
                 self.rect.right = block.rect.left
                 self.change_y = 1
                 self.canWalljumpRight = True
+                self.slideBoost = False
             elif self.change_x < 0:
                 self.rect.left = block.rect.right
                 self.change_y = 1
                 self.canWalljumpLeft = True
-
+                self.slideBoost = False
+            
+        # Checks for jump boost
+        if self.jumpBoost:
+            self.change_y = -15
+            self.jumpBoost = False
+            
         # Player moves vertically
         self.rect.y += self.change_y
 
@@ -86,9 +97,21 @@ class Player(pygame.sprite.Sprite):
         for block in block_hit_list:
             if self.change_y > 0:
                 self.rect.bottom = block.rect.top
-                self.isGrounded = True
+                # If the player jumps on a slime block they get a jump boost
+                if block.type == "jump":
+                    self.jumpBoost = True
+                else:
+                    self.isGrounded = True
+                if block.type == "slide":
+                    self.slideBoost = True
+                else:
+                    self.slideBoost = False
             elif self.change_y < 0:
-                self.rect.top = block.rect.bottom
+                if block.type == "acid":
+                    self.rect.x = 10
+                    self.rect.y = 20
+                else:
+                    self.rect.top = block.rect.bottom
             
             # Stop the player's vertical movement if there's a collison
             self.change_y = 0
@@ -113,12 +136,14 @@ class Player(pygame.sprite.Sprite):
             self.change_y = -10
         elif self.canWalljumpRight:
             self.change_y = -10
-            self.rightWalljump = True
+            self.change_x = -2
             self.canWalljumpRight = False
+            self.haltWalljump = True
         elif self.canWalljumpLeft:
             self.change_y = -10
-            self.leftWalljump = True
+            self.change_x = 2
             self.canWalljumpLeft = False
+            self.haltWalljump = True
 
 # ----- Platform class -----
 """ Create the platform class as a subclass of pygame.sprite.Srpite """
@@ -132,9 +157,7 @@ class Platform(pygame.sprite.Sprite):
 
         # Create the platform block
         self.image = pygame.Surface([width, height])
-        self.image.fill(BLACK)
         self.rect = self.image.get_rect()
-
 
 # ----- Level class -----
 """ Create the level class """
@@ -162,6 +185,15 @@ class Level(object):
             block = Platform(platform[2], platform[3])
             block.rect.x = platform[0]
             block.rect.y = platform[1]
+            block.type = platform[4]
+            if block.type == "normal":
+                block.image.fill(BLACK)
+            elif block.type == "jump":
+                block.image.fill(PURPLE)
+            elif block.type == "acid":
+                block.image.fill(GREEN)
+            else:
+                block.image.fill(ORANGE)
             block.player = self.player
             self.platform_list.add(block)
 
@@ -176,7 +208,7 @@ class Level(object):
 """ Create the levels as subclasses of Level """
 class Level_01(Level):
 
-    """ The constructor method is called whne the object is instantiated """
+    """ The constructor method is called when the object is instantiated """
     def __init__(self, player):
 
         """ Call the parent constructor method """
@@ -186,14 +218,16 @@ class Level_01(Level):
         self.name = "Level 1"
 
         # Create a list of platforms in the level
-        platforms = [[0, 200, 1000, 20]]
+        platforms = [[  0, 490, 1000, 10,   "jump"],
+                     [100, 202,  100, 20,   "acid"],
+                     [  0, 200, 1000, 20, "normal"]]
         
         # Pass the list of platfroms to the build method
-        self.build(platforms) 
+        self.build(platforms)
 
 class Level_02(Level):
 
-    """ The constructor method is called whne the object is instantiated """
+    """ The constructor method is called when the object is instantiated """
     def __init__(self, player):
 
         """ Call the parent constructor method """
@@ -203,7 +237,9 @@ class Level_02(Level):
         self.name = "Level 2"
 
         # Create a list of platforms in the level
-        platforms = [[300, 100, 200, 300]]
+        platforms = [[  0, 490, 900,  10,  "slide"],
+                     [300,  90, 200, 300, "normal"],
+                     [ -1, 200,   1,  20, "normal"]]
 
         # Pass the list of platfroms to the build method
         self.build(platforms) 

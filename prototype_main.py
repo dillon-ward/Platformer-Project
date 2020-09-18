@@ -38,8 +38,8 @@ while not done:
 
     # ----- Input Stage -----
     for event in pygame.event.get():        
-        if event.type == pygame.QUIT:       # User clicked close
-            done = True                     # Breaks out of main program loop
+        if event.type == pygame.QUIT:      # User clicked close
+            done = True                    # Breaks out of main program loop
             
         # User presses a key
         if event.type == pygame.KEYDOWN:
@@ -54,8 +54,6 @@ while not done:
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_LEFT and player.change_x < 0 or event.key == pygame.K_RIGHT and player.change_x > 0:
                 player.stop()
-            if event.key == pygame.K_UP:
-                player.canWalljump = False
 
     # ---- Logic Stage -----
     # Update the player
@@ -79,10 +77,6 @@ while not done:
             player.rect.x = 0
         else:
             player.rect.x = 950
-
-    # Stop player from going above the screen
-    if player.rect.y < 0:
-        player.rect.y = 0
 
     # Set the player in the current level
     current_level = level_list[current_level_no]
